@@ -1,0 +1,224 @@
+import json
+import os
+import subprocess # 新增：用于执行系统命令
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# 👇 修正后的工具列表
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "execute_command",
+            "description": "当用户想要打开电脑上的软件（如计算器、记事本）时使用此工具。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "software_name": {
+                        "type": "string",
+                        # ✅ 修正：写清楚这里要填什么
+                        "description": "要打开的软件名称，如 calc 或 notepad" 
+                    }
+                },
+                "required": ["software_name"]
+            }
+        }
+    }
+]
+
+load_dotenv("key.env")
+
+api_key = os.getenv("DEEPSEEK_API_KEY")
+
+client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+
+
+def load_memory(filepath: str) -> list:
+    """
+    功能: 从指定路径读取 JSON 文件
+    参数 filepath: 文件路径 (str)
+    返回: 聊天记录列表 (list)
+    """
+    # --- 填空区域开始 ---
+    try:
+        # 注意：这里打开文件时，不要写死 "memory.json"，要用变量 filepath
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f) # 我们把读到的东西暂存到 data 变量
+    except FileNotFoundError:
+        data = [] # 如果找不到文件，就创建一个空列表
+    # --- 填空区域结束 ---
+    
+    # 最后，把结果交出去
+    return data
+
+def save_memory(filepath: str, data: list) -> None:
+    """
+    功能: 将数据写入 JSON 文件
+    参数 filepath: 文件路径 (str)
+    参数 data: 要保存的数据 (list)
+    返回: None
+    """
+    # 这里的 "w" 模式会覆盖写入，符合我们之前的逻辑
+    with open(filepath, "w", encoding="utf-8") as f:
+        # 👇 请把原来 json.dump 的逻辑搬进来
+        # 提示: 第一个参数是要存的数据变量名，第二个是文件对象 f
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# def get_ai_response(messages: list) -> str:
+#     """
+#     功能: 调用 DeepSeek API 获取回复
+#     参数 messages: 聊天记录列表 (list)
+#     返回: AI 的回复文本 (str)
+#     """
+#     # 🌟 25w 年薪级细节: 加上 try-except 防止断网导致程序崩溃
+#     try:
+#         response = client.chat.completions.create(
+#             model="deepseek-chat",
+#             # 👇 这里要把参数传进去
+#             messages=messages
+#         )
+#         # 👇 提取回复文本并返回
+#         return response.choices[0].message.content
+        
+#     except Exception as e:
+#         # 如果出错了 (比如断网、没钱了)，打印错误并返回一个提示
+#         print(f"❌ API 调用失败: {e}")
+#         return "（贾维斯掉线了，请检查网络...）"
+# 👇 注意返回值类型变成了 object (因为它不再只是个字符串了)
+def get_ai_response(messages: list) -> object:
+    """
+    功能: 调用 API，并将工具列表(tools)传给 AI
+    """
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages,
+            # 🔥 关键改变：把菜单递上去！
+            tools=tools
+        )
+        # 👇 返回整个消息对象 (里面包含 content 和 tool_calls)
+        return response.choices[0].message
+        
+    except Exception as e:
+        print(f"❌ API连接失败: {e}")
+        return None
+
+# ... (上面是你写好的三个函数：load_memory, save_memory, get_ai_response) ...
+
+def execute_command(text: str) -> None:
+    """
+    功能: 根据文本关键词执行系统命令 (简易版意图识别)
+    """
+    # 转换为小写，防止用户输入 Calc 导致匹配失败
+    text = text.lower()
+    
+    # 👇 修改这一行，多加一个 "or"
+    if "计算器" in text or "计算机" in text or "calc" in text:
+        print("✅ 命中规则：计算器")
+        print("🔧 正在执行 subprocess...")
+        subprocess.Popen("start calc", shell=True)
+    
+    elif "记事本" in text or "notepad" in text:
+        print("📝 检测到指令：正在启动记事本...")
+        subprocess.Popen("start notepad", shell=True)
+
+# def main():
+#     """
+#     主程序入口：负责调度所有模块
+#     """
+#     print("🚀 贾维斯 (25w工程版) 正在启动...")
+    
+#     # 1. 定义记忆文件路径
+#     memory_file = "memory.json"
+    
+#     # 2. 调用函数：加载记忆
+#     # 提示：把 memory_file 传进去，把结果赋值给 chat_history
+#     chat_history = load_memory(memory_file)
+
+#     while True:
+#         user_input = input("\n你说: ")
+        
+#         # ... (上面是 user_input = input(...) ) ...
+        
+#         if user_input.lower() == "quit":
+#             print("👋 再见！")
+#             break
+        
+#         # 🔥 新增：先让机械手检查一下有没有能干的活
+#         # 只要用户说了“计算器”，直接弹窗，不需要问 AI
+#         execute_command(user_input)
+        
+#         # ... (下面继续走 chat_history.append ... ) ...
+        
+#         # 3. 记录用户输入
+#         chat_history.append({"role": "user", "content": user_input})
+        
+#         # 4. 调用函数：获取 AI 回复 (最关键的一步！)
+#         # 提示：调用 get_ai_response，把 chat_history 传给它
+#         # 结果赋值给 ai_msg
+#         ai_msg = get_ai_response(chat_history)
+        
+#         print(f"🤖 AI: {ai_msg}")
+        
+#         # 5. 记录 AI 回复
+#         chat_history.append({"role": "assistant", "content": ai_msg})
+        
+#         # 6. 调用函数：保存记忆
+#         # 提示：把 memory_file 和 chat_history 传进去
+#         save_memory(memory_file, chat_history)
+def main():
+    print("🚀 Jarvis (AI 决策版) 正在启动...")
+    memory_file = "memory.json"
+    chat_history = load_memory(memory_file)
+
+    while True:
+        user_input = input("\n你说: ")
+        if user_input.lower() == "quit":
+            break
+        
+        # 1. 存入用户消息
+        chat_history.append({"role": "user", "content": user_input})
+        
+        # 2. 获取 AI 响应 (现在是一个对象，不是字符串了！)
+        ai_message = get_ai_response(chat_history)
+
+        if ai_message is None:
+            continue # 如果报错了，跳过这次循环
+
+        # =================================================
+        # 🧠 核心大脑：判断是“说话”还是“做事”？
+        # =================================================
+        
+        # 🟢 情况 A: AI 决定调用工具 (tool_calls 列表不为空)
+        if ai_message.tool_calls:
+            # 获取第一个工具调用指令
+            tool_call = ai_message.tool_calls[0]
+            func_name = tool_call.function.name
+            
+            # 🔥 关键：解析 AI 给出的参数 (它是 JSON 字符串，要转成字典)
+            # 这一步如果不加，你拿到的只是字符串，没法用
+            args = json.loads(tool_call.function.arguments)
+            
+            print(f"🤖 AI 决定调用工具: {func_name}")
+            print(f"⚙️ 参数: {args}")
+
+            # 路由分发 (Router)
+            if func_name == "execute_command":
+                # 从字典里拿出 software_name，传给我们的机械手
+                software = args.get("software_name")
+                execute_command(software)
+                
+                # (可选) 假装 AI 回复了一句，为了不让程序报错
+                print("🤖 AI: 正在为您执行...")
+                chat_history.append({"role": "assistant", "content": f"已执行: 打开 {software}"})
+
+        # 🔵 情况 B: AI 正常聊天 (tool_calls 为空，但有 content)
+        elif ai_message.content:
+            print(f"🤖 AI: {ai_message.content}")
+            chat_history.append({"role": "assistant", "content": ai_message.content})
+
+        # 3. 实时存档
+        save_memory(memory_file, chat_history)
+
+if __name__ == "__main__":
+    main()
