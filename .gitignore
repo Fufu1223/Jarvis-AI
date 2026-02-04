@@ -1,11 +1,11 @@
-# 忽略环境变量文件 (保护 Key)
+# --- 1. 核心安全区 (绝对不能传) ---
+.streamlit/secrets.toml
 .env
-key.env
 *.env
 
-# 忽略 Python 缓存文件
+# --- 2. 垃圾清理区 (Python 缓存) ---
 __pycache__/
 *.pyc
 
-# 忽略系统文件
+# --- 3. 系统文件区 (Mac/Windows 生成的杂物) ---
 .DS_Store
